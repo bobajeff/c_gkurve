@@ -1,4 +1,3 @@
-#include "cglm/mat4.h"
 #include "create_surface.h"
 #include "framework.h"
 #include "webgpu.h"
@@ -17,13 +16,14 @@
 typedef struct Vertex {
   vec4 pos;
   vec2 uv;
+  vec3 bary;
 } Vertex;
 
 // Simple triangle
 Vertex vertices[] = {
-    {.pos = {0, 0.5, 0, 1}, .uv = {0.5, 1}},
-    {.pos = {-0.5, -0.5, 0, 1}, .uv = {0, 0}},
-    {.pos = {0.5, -0.5, 0, 1}, .uv = {1, 0}},
+    {.pos = {0, 0.5, 0, 1}, .uv = {0.5, 1}, .bary = {0, 0, 1}},
+    {.pos = {-0.5, -0.5, 0, 1}, .uv = {0, 0}, .bary = {1, 0, 0}},
+    {.pos = {0.5, -0.5, 0, 1}, .uv = {1, 0}, .bary = {0, 1, 0}},
 };
 
 // The uniform read by the vertex shader, it contains the matrix
@@ -32,14 +32,11 @@ typedef struct VertexUniform {
     mat4 mat;
 } VertexUniform;
 
-// The uniform read by the fragment shader, the points are used
-// to calculate the bezier curve, and more or less coincide with uvs
-// (Vec4 for alignment)
 typedef struct FragUniform {
-    vec4 points[3];
     // TODO use an enum? Remember that it will be casted to u32 in wgsl
     // type,
     uint32_t type;
+    vec3 padding;
 } FragUniform;
 
 // TODO texture and sampler, create buffers and use an index field
@@ -75,7 +72,7 @@ int main(int argc, char *argv[]) {
   }
 
   glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
-  GLFWwindow *window = glfwCreateWindow(640, 480, "wgpu with glfw", NULL, NULL);
+  GLFWwindow *window = glfwCreateWindow(512, 512, "wgpu with glfw", NULL, NULL);
 
   if (!window) {
     printf("Cannot create window");
@@ -113,8 +110,11 @@ int main(int argc, char *argv[]) {
                                    {.shaderLocation = 1,
                                     .offset = offsetof(Vertex, uv),
                                     .format = WGPUVertexFormat_Float32x2},
+                                   {.shaderLocation = 2,
+                                    .offset = offsetof(Vertex, bary),
+                                    .format = WGPUVertexFormat_Float32x3},
                                },
-                           .attributeCount = 2,
+                           .attributeCount = 3,
                            .stepMode = WGPUVertexStepMode_Vertex},
                          },},
           .primitive =
@@ -212,44 +212,20 @@ int main(int argc, char *argv[]) {
 
   FragUniform * frag_uniform_mapped = wgpuBufferGetMappedRange(frag_uniform_buffer, 0, sizeof(FragUniform) * num_instances);
 
-  FragUniform tmp_frag_ubo[] = {{.points =
-                                     {
-                                         {0, 0, 0, 0},
-                                         {0.5, 1, 0, 0},
-                                         {1, 0, 0, 0},
-                                     },
-                                 .type = 1},
-                                {.points =
-                                     {
-                                         {0, 0, 0, 0},
-                                         {0.5, 1, 0, 0},
-                                         {1, 0, 0, 0},
-                                     },
-                                 .type = 0},
-                                {.points =
-                                     {
-                                         {0, 0, 0, 0},
-                                         {0.5, 1, 0, 0},
-                                         {1, 0, 0, 0},
-                                     },
-                                 .type = 2}};
+  FragUniform tmp_frag_ubo[] = {{.type = 1}, {.type = 0}, {.type = 2}};
 
-    memcpy(frag_uniform_mapped, tmp_frag_ubo, sizeof(tmp_frag_ubo));
-    wgpuBufferUnmap(frag_uniform_buffer);
+  memcpy(frag_uniform_mapped, tmp_frag_ubo, sizeof(tmp_frag_ubo));
+  wgpuBufferUnmap(frag_uniform_buffer);
 
-    VertexUniform ubos[] = {
-        {.mat = {}},
-        {.mat = {}},
-        {.mat = {}}
-    };
-    glm_mat4_identity(ubos[0].mat);
-    glm_mat4_identity(ubos[1].mat);
-    glm_mat4_identity(ubos[2].mat);
-    glm_translate(ubos[0].mat, (float[]){0.5, 0.5, 0});
-    glm_translate(ubos[1].mat, (float[]){-0.5, 0, 0});
-    glm_translate(ubos[2].mat, (float[]){0.5, -0.5, 0});
-    wgpuQueueWriteBuffer(queue, vertex_uniform_buffer, 0, ubos,
-                            vertex_uniform_buffer_size);
+  VertexUniform ubos[] = {{.mat = {}}, {.mat = {}}, {.mat = {}}};
+  glm_mat4_identity(ubos[0].mat);
+  glm_mat4_identity(ubos[1].mat);
+  glm_mat4_identity(ubos[2].mat);
+  glm_translate(ubos[0].mat, (float[]){0.5, 0.5, 0});
+  glm_translate(ubos[1].mat, (float[]){-0.5, 0, 0});
+  glm_translate(ubos[2].mat, (float[]){0.5, -0.5, 0});
+  wgpuQueueWriteBuffer(queue, vertex_uniform_buffer, 0, ubos,
+                       vertex_uniform_buffer_size);
 
   const WGPUBuffer vertex_buffer = wgpuDeviceCreateBuffer(
       device, &(WGPUBufferDescriptor){.label = "vertex buffer vertices",
