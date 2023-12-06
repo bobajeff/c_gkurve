@@ -16,14 +16,13 @@
 typedef struct Vertex {
   vec4 pos;
   vec2 uv;
-  vec3 bary;
 } Vertex;
 
 // Simple triangle
 Vertex vertices[] = {
-    {.pos = {0, 0.5, 0, 1}, .uv = {0.5, 1}, .bary = {0, 0, 1}},
-    {.pos = {-0.5, -0.5, 0, 1}, .uv = {0, 0}, .bary = {1, 0, 0}},
-    {.pos = {0.5, -0.5, 0, 1}, .uv = {1, 0}, .bary = {0, 1, 0}},
+    {.pos = {0, 0.5, 0, 1}, .uv = {0.5, 1}},
+    {.pos = {-0.5, -0.5, 0, 1}, .uv = {0, 0}},
+    {.pos = {0.5, -0.5, 0, 1}, .uv = {1, 0}},
 };
 
 // The uniform read by the vertex shader, it contains the matrix
@@ -110,11 +109,8 @@ int main(int argc, char *argv[]) {
                                    {.shaderLocation = 1,
                                     .offset = offsetof(Vertex, uv),
                                     .format = WGPUVertexFormat_Float32x2},
-                                   {.shaderLocation = 2,
-                                    .offset = offsetof(Vertex, bary),
-                                    .format = WGPUVertexFormat_Float32x3},
                                },
-                           .attributeCount = 3,
+                           .attributeCount = 2,
                            .stepMode = WGPUVertexStepMode_Vertex},
                          },},
           .primitive =
