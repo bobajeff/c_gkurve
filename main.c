@@ -19,11 +19,26 @@ typedef struct Vertex {
 } Vertex;
 
 // Simple triangle
+#define WINDOW_WIDTH 640
+#define WINDOW_HEIGHT 480
+#define TRIANGLE_SCALE 250.0
+#define SQRT_0_75 0.8660254037844386 // sqrt(.75)
+#define TRIANGLE_HEIGHT (TRIANGLE_SCALE * SQRT_0_75)
 Vertex vertices[] = {
-    {.pos = {0, 0.5, 0, 1}, .uv = {0.5, 1}},
-    {.pos = {-0.5, -0.5, 0, 1}, .uv = {0, 0}},
-    {.pos = {0.5, -0.5, 0, 1}, .uv = {1, 0}},
+    { .pos = { (float)WINDOW_WIDTH / 2 + TRIANGLE_SCALE / 2, (float)WINDOW_HEIGHT / 2 + TRIANGLE_HEIGHT, 0, 1 }, .uv = { 0.5, 1 } },
+    { .pos = { (float)WINDOW_WIDTH / 2, (float)WINDOW_HEIGHT / 2, 0, 1 }, .uv = { 0, 0 } },
+    { .pos = { (float)WINDOW_WIDTH / 2 + TRIANGLE_SCALE, (float)WINDOW_HEIGHT / 2 + 0, 0, 1 }, .uv = { 1, 0 } },
+
+    { .pos = { (float)WINDOW_WIDTH / 2 + TRIANGLE_SCALE / 2, (float)WINDOW_HEIGHT / 2, 0, 1 }, .uv = { 0.5, 1 } },
+    { .pos = { (float)WINDOW_WIDTH / 2, (float)WINDOW_HEIGHT / 2 - TRIANGLE_HEIGHT, 0, 1 }, .uv = { 0, 0 } },
+    { .pos = { (float)WINDOW_WIDTH / 2 + TRIANGLE_SCALE, (float)WINDOW_HEIGHT / 2 - TRIANGLE_HEIGHT, 0, 1 }, .uv = { 1, 0 } },
+
+    { .pos = { (float)WINDOW_WIDTH / 2 - TRIANGLE_SCALE / 2, (float)WINDOW_HEIGHT / 2 + TRIANGLE_HEIGHT, 0, 1 }, .uv = { 0.5, 1 } },
+    { .pos = { (float)WINDOW_WIDTH / 2, (float)WINDOW_HEIGHT / 2, 0, 1 }, .uv = { 0, 0 } },
+    { .pos = { (float)WINDOW_WIDTH / 2 - TRIANGLE_SCALE, (float)WINDOW_HEIGHT / 2 + 0, 0, 1 }, .uv = { 1, 0 } },
 };
+
+size_t vertices_length = sizeof(vertices)/sizeof(Vertex);
 
 // The uniform read by the vertex shader, it contains the matrix
 // that will move vertices
@@ -40,9 +55,6 @@ typedef struct FragUniform {
 
 // TODO texture and sampler, create buffers and use an index field
 // in FragUniform to tell which texture to read
-
-// Hard-coded, if you change it remember to change it in the shaders
-const uint32_t num_instances = 3;
 
 int main(int argc, char *argv[]) {
   srand(time(NULL)); // seed random number generator
@@ -71,7 +83,7 @@ int main(int argc, char *argv[]) {
   }
 
   glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
-  GLFWwindow *window = glfwCreateWindow(512, 512, "wgpu with glfw", NULL, NULL);
+  GLFWwindow *window = glfwCreateWindow(WINDOW_WIDTH, WINDOW_HEIGHT, "wgpu with glfw", NULL, NULL);
 
   if (!window) {
     printf("Cannot create window");
@@ -177,18 +189,18 @@ int main(int argc, char *argv[]) {
       });
 
   
-  const uint64_t vertex_uniform_buffer_size = sizeof(VertexUniform) * num_instances;
+  const uint64_t vertex_uniform_buffer_size = sizeof(VertexUniform);
   WGPUBuffer vertex_uniform_buffer = wgpuDeviceCreateBuffer(
         device, &(WGPUBufferDescriptor){.label = "vertex uniform",
                                         .size = vertex_uniform_buffer_size,
                                         .usage = WGPUBufferUsage_Uniform |
                                                 WGPUBufferUsage_CopyDst,
                                         .mappedAtCreation = false});
-  const uint64_t frag_uniform_buffer_size = sizeof(FragUniform) * num_instances;
+  const uint64_t frag_uniform_buffer_size = sizeof(FragUniform) * vertices_length / 3;
   WGPUBuffer frag_uniform_buffer = wgpuDeviceCreateBuffer(
         device, &(WGPUBufferDescriptor){.label = "frag uniform",
                                         .size = frag_uniform_buffer_size,
-                                        .usage = WGPUBufferUsage_Uniform,
+                                        .usage = WGPUBufferUsage_Storage,
                                         .mappedAtCreation = true});
 
   WGPUBindGroup bind_group = wgpuDeviceCreateBindGroup(
@@ -206,20 +218,21 @@ int main(int argc, char *argv[]) {
                                              .offset = 0}},
           .entryCount = 2});
 
-  FragUniform * frag_uniform_mapped = wgpuBufferGetMappedRange(frag_uniform_buffer, 0, sizeof(FragUniform) * num_instances);
+  FragUniform * frag_uniform_mapped = wgpuBufferGetMappedRange(frag_uniform_buffer, 0, sizeof(FragUniform) *  vertices_length / 3);
 
   FragUniform tmp_frag_ubo[] = {{.type = 1}, {.type = 0}, {.type = 2}};
 
   memcpy(frag_uniform_mapped, tmp_frag_ubo, sizeof(tmp_frag_ubo));
   wgpuBufferUnmap(frag_uniform_buffer);
 
-  VertexUniform ubos[] = {{.mat = {}}, {.mat = {}}, {.mat = {}}};
-  glm_mat4_identity(ubos[0].mat);
-  glm_mat4_identity(ubos[1].mat);
-  glm_mat4_identity(ubos[2].mat);
-  glm_translate(ubos[0].mat, (float[]){0.5, 0.5, 0});
-  glm_translate(ubos[1].mat, (float[]){-0.5, 0, 0});
-  glm_translate(ubos[2].mat, (float[]){0.5, -0.5, 0});
+  VertexUniform ubos[] = {{.mat = {}}};
+  mat4 proj = {};
+  mat4 translation = {};
+  glm_ortho(0, WINDOW_WIDTH, 0, WINDOW_HEIGHT, -100, 100, proj);
+  glm_mat4_identity(translation);
+  glm_translate(translation, (float[]){-1, -1, 0});
+  glm_mat4_mul(proj, translation, ubos[0].mat);
+
   wgpuQueueWriteBuffer(queue, vertex_uniform_buffer, 0, ubos,
                        vertex_uniform_buffer_size);
 
@@ -378,7 +391,7 @@ int main(int argc, char *argv[]) {
                                          sizeof(vertices));
     
     wgpuRenderPassEncoderSetBindGroup(pass, 0, bind_group, 0, NULL);
-    wgpuRenderPassEncoderDraw(pass, 3, num_instances, 0, 0);
+    wgpuRenderPassEncoderDraw(pass, vertices_length, 1, 0, 0);
 
     wgpuRenderPassEncoderEnd(pass);
 
