@@ -18,28 +18,6 @@ typedef struct Vertex {
   vec2 uv;
 } Vertex;
 
-// Simple triangle
-#define WINDOW_WIDTH 640
-#define WINDOW_HEIGHT 480
-#define TRIANGLE_SCALE 250.0
-#define SQRT_0_75 0.8660254037844386 // sqrt(.75)
-#define TRIANGLE_HEIGHT (TRIANGLE_SCALE * SQRT_0_75)
-Vertex vertices[] = {
-    { .pos = { (float)WINDOW_WIDTH / 2 + TRIANGLE_SCALE / 2, (float)WINDOW_HEIGHT / 2 + TRIANGLE_HEIGHT, 0, 1 }, .uv = { 0.5, 1 } },
-    { .pos = { (float)WINDOW_WIDTH / 2, (float)WINDOW_HEIGHT / 2, 0, 1 }, .uv = { 0, 0 } },
-    { .pos = { (float)WINDOW_WIDTH / 2 + TRIANGLE_SCALE, (float)WINDOW_HEIGHT / 2 + 0, 0, 1 }, .uv = { 1, 0 } },
-
-    { .pos = { (float)WINDOW_WIDTH / 2 + TRIANGLE_SCALE / 2, (float)WINDOW_HEIGHT / 2, 0, 1 }, .uv = { 0.5, 1 } },
-    { .pos = { (float)WINDOW_WIDTH / 2, (float)WINDOW_HEIGHT / 2 - TRIANGLE_HEIGHT, 0, 1 }, .uv = { 0, 0 } },
-    { .pos = { (float)WINDOW_WIDTH / 2 + TRIANGLE_SCALE, (float)WINDOW_HEIGHT / 2 - TRIANGLE_HEIGHT, 0, 1 }, .uv = { 1, 0 } },
-
-    { .pos = { (float)WINDOW_WIDTH / 2 - TRIANGLE_SCALE / 2, (float)WINDOW_HEIGHT / 2 + TRIANGLE_HEIGHT, 0, 1 }, .uv = { 0.5, 1 } },
-    { .pos = { (float)WINDOW_WIDTH / 2, (float)WINDOW_HEIGHT / 2, 0, 1 }, .uv = { 0, 0 } },
-    { .pos = { (float)WINDOW_WIDTH / 2 - TRIANGLE_SCALE, (float)WINDOW_HEIGHT / 2 + 0, 0, 1 }, .uv = { 1, 0 } },
-};
-
-size_t vertices_length = sizeof(vertices)/sizeof(Vertex);
-
 // The uniform read by the vertex shader, it contains the matrix
 // that will move vertices
 typedef struct VertexUniform {
@@ -83,7 +61,7 @@ int main(int argc, char *argv[]) {
   }
 
   glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
-  GLFWwindow *window = glfwCreateWindow(WINDOW_WIDTH, WINDOW_HEIGHT, "wgpu with glfw", NULL, NULL);
+  GLFWwindow *window = glfwCreateWindow(640, 480, "wgpu with glfw", NULL, NULL);
 
   if (!window) {
     printf("Cannot create window");
@@ -188,6 +166,28 @@ int main(int argc, char *argv[]) {
           },
       });
 
+int window_width, window_height;
+glfwGetWindowSize(window, (int *)&window_width, (int *)&window_height);
+float fb_width = (float)window_width;
+float fb_height = (float)window_height;
+float fb_scale = fb_width / 640;
+float triangle_scale = 250.0 * fb_scale;
+float triangle_height = triangle_scale * sqrtf(.75);
+Vertex vertices[] = {
+    { .pos = { fb_width / 2 + triangle_scale / 2, fb_height / 2 + triangle_height, 0, 1 }, .uv = { 0.5, 1 } },
+    { .pos = { fb_width / 2, fb_height / 2, 0, 1 }, .uv = { 0, 0 } },
+    { .pos = { fb_width / 2 + triangle_scale, fb_height / 2 + 0, 0, 1 }, .uv = { 1, 0 } },
+
+    { .pos = { fb_width / 2 + triangle_scale / 2, fb_height / 2, 0, 1 }, .uv = { 0.5, 1 } },
+    { .pos = { fb_width / 2, fb_height / 2 - triangle_height, 0, 1 }, .uv = { 0, 0 } },
+    { .pos = { fb_width / 2 + triangle_scale, fb_height / 2 - triangle_height, 0, 1 }, .uv = { 1, 0 } },
+
+    { .pos = { fb_width / 2 - triangle_scale / 2, fb_height / 2 + triangle_height, 0, 1 }, .uv = { 0.5, 1 } },
+    { .pos = { fb_width / 2, fb_height / 2, 0, 1 }, .uv = { 0, 0 } },
+    { .pos = { fb_width / 2 - triangle_scale, fb_height / 2 + 0, 0, 1 }, .uv = { 1, 0 } },
+};
+
+size_t vertices_length = sizeof(vertices)/sizeof(Vertex);
   
   const uint64_t vertex_uniform_buffer_size = sizeof(VertexUniform);
   WGPUBuffer vertex_uniform_buffer = wgpuDeviceCreateBuffer(
@@ -228,7 +228,7 @@ int main(int argc, char *argv[]) {
   VertexUniform ubos[] = {{.mat = {}}};
   mat4 proj = {};
   mat4 translation = {};
-  glm_ortho(0, WINDOW_WIDTH, 0, WINDOW_HEIGHT, -100, 100, proj);
+  glm_ortho(0, fb_width, 0, fb_height, -100, 100, proj);
   glm_mat4_identity(translation);
   glm_translate(translation, (float[]){-1, -1, 0});
   glm_mat4_mul(proj, translation, ubos[0].mat);
@@ -310,8 +310,6 @@ int main(int argc, char *argv[]) {
     // make a command encoder to start encoding commands
     WGPUCommandEncoder encoder = wgpuDeviceCreateCommandEncoder(
         device, &(WGPUCommandEncoderDescriptor){.label = "our encoder"});
-
-    int window_width, window_height;
 
     glfwGetWindowSize(window, (int *)&window_width, (int *)&window_height);
 
