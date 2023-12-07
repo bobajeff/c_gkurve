@@ -6,7 +6,7 @@ struct FragUniform {
 
 @fragment fn main( 
     @location(0) uv : vec2<f32>,
-    @interpolate(linear) @location(1) bary: vec3<f32>,
+    @interpolate(linear) @location(1) bary: vec2<f32>,
     @interpolate(flat) @location(2) triangle_index: u32,
 ) -> @location(0) vec4<f32> {
     // Example 1: Visualize barycentric coordinates:
