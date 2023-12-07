@@ -182,9 +182,9 @@ Vertex vertices[] = {
     { .pos = { fb_width / 2, fb_height / 2 - triangle_height, 0, 1 }, .uv = { 0, 0 } },
     { .pos = { fb_width / 2 + triangle_scale, fb_height / 2 - triangle_height, 0, 1 }, .uv = { 1, 0 } },
 
-    { .pos = { fb_width / 2 - triangle_scale / 2, fb_height / 2 + triangle_height, 0, 1 }, .uv = { 0.5, 1 } },
-    { .pos = { fb_width / 2, fb_height / 2, 0, 1 }, .uv = { 0, 0 } },
-    { .pos = { fb_width / 2 - triangle_scale, fb_height / 2 + 0, 0, 1 }, .uv = { 1, 0 } },
+    { .pos = { fb_width / 2 - triangle_scale / 2, (fb_height / 2 - triangle_height / 2) + triangle_height, 0, 1 }, .uv = { 0.5, 1 } },
+    { .pos = { fb_width / 2, fb_height / 2 - triangle_height / 2, 0, 1 }, .uv = { 0, 0 } },
+    { .pos = { fb_width / 2 - triangle_scale, fb_height / 2 - triangle_height / 2, 0, 1 }, .uv = { 1, 0 } },
 };
 
 size_t vertices_length = sizeof(vertices)/sizeof(Vertex);
