@@ -225,17 +225,6 @@ size_t vertices_length = sizeof(vertices)/sizeof(Vertex);
   memcpy(frag_uniform_mapped, tmp_frag_ubo, sizeof(tmp_frag_ubo));
   wgpuBufferUnmap(frag_uniform_buffer);
 
-  VertexUniform ubos[] = {{.mat = {}}};
-  mat4 proj = {};
-  mat4 translation = {};
-  glm_ortho(0, fb_width, 0, fb_height, -100, 100, proj);
-  glm_mat4_identity(translation);
-  glm_translate(translation, (float[]){-1, -1, 0});
-  glm_mat4_mul(proj, translation, ubos[0].mat);
-
-  wgpuQueueWriteBuffer(queue, vertex_uniform_buffer, 0, ubos,
-                       vertex_uniform_buffer_size);
-
   const WGPUBuffer vertex_buffer = wgpuDeviceCreateBuffer(
       device, &(WGPUBufferDescriptor){.label = "vertex buffer vertices",
                                       .size = sizeof(vertices),
@@ -387,7 +376,17 @@ size_t vertices_length = sizeof(vertices)/sizeof(Vertex);
     wgpuRenderPassEncoderSetPipeline(pass, pipeline);
     wgpuRenderPassEncoderSetVertexBuffer(pass, 0, vertex_buffer, 0,
                                          sizeof(vertices));
-    
+    VertexUniform ubos[] = {{.mat = {}}};
+    mat4 proj = {};
+    mat4 translation = {};
+    glm_ortho(0, (float)window_width, 0, (float)window_height, -100, 100, proj);
+    glm_mat4_identity(translation);
+    glm_translate(translation, (float[]){-1, -1, 0});
+    glm_mat4_mul(proj, translation, ubos[0].mat);
+
+    wgpuQueueWriteBuffer(queue, vertex_uniform_buffer, 0, ubos,
+                         vertex_uniform_buffer_size);
+
     wgpuRenderPassEncoderSetBindGroup(pass, 0, bind_group, 0, NULL);
     wgpuRenderPassEncoderDraw(pass, vertices_length, 1, 0, 0);
 
