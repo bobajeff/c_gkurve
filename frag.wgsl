@@ -10,10 +10,9 @@ struct FragUniform {
     @interpolate(flat) @location(2) triangle_index: u32,
 ) -> @location(0) vec4<f32> {
     // Example 1: Visualize barycentric coordinates:
-    // return vec4<f32>(bary.x, bary.y, bary.z, 1.0);
-    // return vec4<f32>(0.0, bary.x, 0.0, 1.0); // bottom-left of triangle
-    // return vec4<f32>(0.0, bary.y, 0.0, 1.0); // bottom-right of triangle
-    // return vec4<f32>(0.0, bary.z, 0.0, 1.0); // top of triangle
+    // return vec4<f32>(bary.x, bary.y, 0.0, 1.0);
+    // return vec4<f32>(0.0, bary.x, 0.0, 1.0); // [1.0 (bottom-left vertex), 0.0 (bottom-right vertex)]
+    // return vec4<f32>(0.0, bary.y, 0.0, 1.0); // [1.0 (bottom-left vertex), 1.0 (top-right face)]
 
     // Example 2: Render gkurve primitives
     var inversion = -1.0;
@@ -38,11 +37,9 @@ struct FragUniform {
 
 	// Signed distance
 	var dist = (bary.x * bary.x - bary.y) / sqrt(fx * fx + fy * fy);
-    // var dist = bary.z*bary.z - bary.y;
 
     dist *= inversion;
-    dist /= 128.0;
-    dist /= 1.75;
+    dist /= 300.0;
 
     // Border rendering.
     if (dist > 0.0 && dist <= 0.1) { return vec4<f32>(1.0, 0.0, 0.0, 1.0); }
