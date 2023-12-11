@@ -12,27 +12,9 @@
 #include <sys/types.h>
 #include <time.h>
 #include <cglm/cglm.h>
-
-typedef struct Vertex {
-  vec4 pos;
-  vec2 uv;
-} Vertex;
-
-// The uniform read by the vertex shader, it contains the matrix
-// that will move vertices
-typedef struct VertexUniform {
-    mat4 mat;
-} VertexUniform;
-
-typedef struct FragUniform {
-    // TODO use an enum? Remember that it will be casted to u32 in wgsl
-    // type,
-    uint32_t type;
-    vec3 padding;
-} FragUniform;
-
-// TODO texture and sampler, create buffers and use an index field
-// in FragUniform to tell which texture to read
+#define STB_IMAGE_IMPLEMENTATION
+#include "stb_image.h"
+#include "draw.h"
 
 int main(int argc, char *argv[]) {
   srand(time(NULL)); // seed random number generator
@@ -168,104 +150,207 @@ int main(int argc, char *argv[]) {
 
 int window_width, window_height;
 glfwGetWindowSize(window, (int *)&window_width, (int *)&window_height);
-float fb_width = (float)window_width;
-float fb_height = (float)window_height;
-float fb_scale = fb_width / 640;
-float triangle_scale = 250.0 * fb_scale;
-float triangle_height = triangle_scale * sqrtf(.75);
-Vertex vertices[] = {
-    { .pos = { fb_width / 2 + triangle_scale / 2, fb_height / 2 + triangle_height, 0, 1 }, .uv = { 0.5, 1 } },
-    { .pos = { fb_width / 2, fb_height / 2, 0, 1 }, .uv = { 0, 0 } },
-    { .pos = { fb_width / 2 + triangle_scale, fb_height / 2 + 0, 0, 1 }, .uv = { 1, 0 } },
+App app = {};
 
-    { .pos = { fb_width / 2 + triangle_scale / 2, fb_height / 2, 0, 1 }, .uv = { 0.5, 1 } },
-    { .pos = { fb_width / 2, fb_height / 2 - triangle_height, 0, 1 }, .uv = { 0, 0 } },
-    { .pos = { fb_width / 2 + triangle_scale, fb_height / 2 - triangle_height, 0, 1 }, .uv = { 1, 0 } },
+#define WINDOW_WIDTH 640.0
+#define WINDOW_HEIGHT 480.0
+// #define TRIANGLE_SCALE 250.0
+// drawEquilateralTriangle(&app, (vec2){ WINDOW_WIDTH / 2, WINDOW_HEIGHT / 2 }, TRIANGLE_SCALE, (FragUniform){.type = GkurveType_Filled, .texture_index = 1, .blend_color = {1,1,1,1}});
+// drawEquilateralTriangle(&app, (vec2){ WINDOW_WIDTH / 2, WINDOW_HEIGHT / 2 - TRIANGLE_SCALE }, TRIANGLE_SCALE, (FragUniform){.type = GkurveType_Concave, .texture_index = 1, .blend_color = {1,1,1,1}});
+// drawEquilateralTriangle(&app, (vec2){ WINDOW_WIDTH / 2 - TRIANGLE_SCALE, WINDOW_HEIGHT / 2 - TRIANGLE_SCALE / 2 }, TRIANGLE_SCALE, (FragUniform){ .type = GkurveType_Convex, .texture_index = 0, .blend_color = {1,1,1,1} });
+// drawQuad(&app, (vec2){0, 0}, (vec2){200, 200}, (FragUniform){.type = GkurveType_Filled, .texture_index = 1, .blend_color = {1,1,1,1}});
+drawCircle(&app, (vec2){ WINDOW_WIDTH / 2, WINDOW_HEIGHT / 2 }, WINDOW_HEIGHT / 2 - 10, (vec4){ 0, 0.5, 0.75, 1.0 });
+// update_vertex_buffer
+const WGPUBuffer vertex_buffer = wgpuDeviceCreateBuffer(
+    device, &(WGPUBufferDescriptor){.label = "vertex buffer vertices",
+                                    .size = app.vertices_size,
+                                    .usage = WGPUBufferUsage_Vertex |
+                                             WGPUBufferUsage_CopyDst,
+                                    .mappedAtCreation = false});
+wgpuQueueWriteBuffer(queue, vertex_buffer, 0, app.vertices, app.vertices_size);
 
-    { .pos = { fb_width / 2 - triangle_scale / 2, (fb_height / 2 - triangle_height / 2) + triangle_height, 0, 1 }, .uv = { 0.5, 1 } },
-    { .pos = { fb_width / 2 - triangle_scale, fb_height / 2 - triangle_height / 2, 0, 1 }, .uv = { 0, 0 } },
-    { .pos = { fb_width / 2, fb_height / 2 - triangle_height / 2, 0, 1 }, .uv = { 1, 0 } },
+size_t vertices_length = app.vertices_size / sizeof(Vertex);
+// update_vertex_uniform_buffer
+size_t vertex_uniform_buffer_size = sizeof(VertexUniform);
+WGPUBuffer vertex_uniform_buffer = wgpuDeviceCreateBuffer(
+    device, &(WGPUBufferDescriptor){.label = "vertex uniform",
+                                    .size = vertex_uniform_buffer_size,
+                                    .usage = WGPUBufferUsage_Uniform |
+                                             WGPUBufferUsage_CopyDst,
+                                    .mappedAtCreation = false});
+VertexUniform ubos[] = {{.mat = {}}};
+mat4 proj = {};
+mat4 translation = {};
+glm_ortho(0, (float)window_width, 0, (float)window_height, -100, 100, proj);
+glm_mat4_identity(translation);
+glm_translate(translation, (float[]){-1, -1, 0});
+glm_mat4_mul(proj, translation, ubos[0].mat);
+wgpuQueueWriteBuffer(queue, vertex_uniform_buffer, 0, ubos, vertex_uniform_buffer_size);
+// update_frag_uniform_buffer
+size_t frag_uniform_buffer_size = sizeof(FragUniform) * vertices_length / 3;
+WGPUBuffer frag_uniform_buffer = wgpuDeviceCreateBuffer(
+    device, &(WGPUBufferDescriptor){.label = "frag uniform",
+                                    .size = frag_uniform_buffer_size,
+                                    .usage = WGPUBufferUsage_Storage |
+                                             WGPUBufferUsage_CopyDst,
+                                    .mappedAtCreation = false});
+wgpuQueueWriteBuffer(queue, frag_uniform_buffer, 0, app.fragment_uniform_list, frag_uniform_buffer_size);
+
+WGPUSampler sampler = wgpuDeviceCreateSampler(
+    device,
+    &(WGPUSamplerDescriptor){
+        .nextInChain = NULL,
+        .label = NULL,
+        .addressModeU = WGPUAddressMode_Repeat,
+        .addressModeV = WGPUAddressMode_Repeat,
+        .addressModeW = WGPUAddressMode_Repeat,
+        .magFilter = WGPUFilterMode_Linear,
+        .minFilter = WGPUFilterMode_Linear,
+        .mipmapFilter = WGPUMipmapFilterMode_Nearest,
+        .lodMinClamp = 0.0,
+        .lodMaxClamp = 0.0,
+        .compare = WGPUCompareFunction_Undefined,
+        .maxAnisotropy = 1, //** mystery_setting ** - needs this value to work
+    });
+
+int img_width, img_height, raw_image_channels;
+unsigned char *img = stbi_load(RESOURCE_DIR "gotta-go-fast.png", &img_width,
+                               &img_height, &raw_image_channels, 4);
+size_t img_data_size = img_width * img_height * 4;
+
+WGPUTexture quad_texture = wgpuDeviceCreateTexture(
+    device,
+    &(WGPUTextureDescriptor){
+        .nextInChain = NULL,
+        .label = "yellow F on red",
+        .size =
+            (WGPUExtent3D){
+                .depthOrArrayLayers = 2, // 2 array layers
+                .width = img_width,
+                .height = img_height},
+        .format = WGPUTextureFormat_RGBA8Unorm,
+        .usage = WGPUTextureUsage_TextureBinding | WGPUTextureUsage_CopyDst |
+                 WGPUTextureUsage_RenderAttachment,
+        .dimension = WGPUTextureDimension_2D,
+        .mipLevelCount = 1, //** mystery_setting ** - needs this value to work
+        .sampleCount = 1,
+        .viewFormatCount = 0,
+        .viewFormats = NULL});
+
+wgpuQueueWriteTexture(
+    queue,
+    &(WGPUImageCopyTexture){.texture = quad_texture,
+                            .nextInChain = NULL,
+                            .aspect = WGPUTextureAspect_All,
+                            .mipLevel = 0,
+                            .origin = (WGPUOrigin3D){.x = 0, .y = 0, .z = 1}}, // layer 2
+    img, img_data_size,
+    &(WGPUTextureDataLayout){
+        .bytesPerRow = img_width * 4,
+        .nextInChain = NULL,
+        .offset = 0,
+        .rowsPerImage = img_height,
+    },
+    &(WGPUExtent3D){.depthOrArrayLayers =
+                        1, // write one layer
+                    .width = img_width,
+                    .height = img_height});
+
+unsigned char *white_texture_data = malloc(img_data_size);
+memset(white_texture_data, 0xff, img_data_size);
+
+wgpuQueueWriteTexture(
+    queue,
+    &(WGPUImageCopyTexture){.texture = quad_texture,
+                            .nextInChain = NULL,
+                            .aspect = WGPUTextureAspect_All,
+                            .mipLevel = 0,
+                            .origin = (WGPUOrigin3D){.x = 0, .y = 0, .z = 0}}, // layer 1
+    white_texture_data, img_data_size,
+    &(WGPUTextureDataLayout){
+        .bytesPerRow = img_width * 4,
+        .nextInChain = NULL,
+        .offset = 0,
+        .rowsPerImage = img_height,
+    },
+    &(WGPUExtent3D){.depthOrArrayLayers =
+                        1, // write one layer
+                    .width = img_width,
+                    .height = img_height});
+
+stbi_image_free(img);
+
+WGPUBindGroup bind_group = wgpuDeviceCreateBindGroup(
+    device,
+    &(WGPUBindGroupDescriptor){
+        .label = "bind group for object",
+        .layout = wgpuRenderPipelineGetBindGroupLayout(pipeline, 0),
+        .entries =
+            (WGPUBindGroupEntry[]){
+                {.binding = 0,
+                 .buffer = vertex_uniform_buffer,
+                 .size = vertex_uniform_buffer_size,
+                 .offset = 0},
+                {.binding = 1,
+                 .buffer = frag_uniform_buffer,
+                 .size = frag_uniform_buffer_size,
+                 .offset = 0},
+                {.binding = 2,
+                 .buffer = NULL,
+                 .size = 0,
+                 .offset = 0,
+                 .sampler = sampler},
+                {.binding = 3,
+                 .buffer = NULL,
+                 .size = 0,
+                 .offset = 0,
+                 .textureView = wgpuTextureCreateView(
+                     quad_texture,
+                     &(WGPUTextureViewDescriptor){
+                         .nextInChain = NULL,
+                         .label = NULL,
+                         .format = WGPUTextureFormat_Undefined,
+                         .dimension = WGPUTextureViewDimension_2DArray,
+                         .baseMipLevel = 0,
+                         .mipLevelCount = 1, //** mystery_setting ** - needs
+                                             // this value to work
+                         .baseArrayLayer = 0,
+                         .arrayLayerCount = 2, // 2 array layers
+                         // this value to work
+                         .aspect = WGPUTextureAspect_All,
+                     })},
+            },
+        .entryCount = 4});
+
+WGPUSwapChainDescriptor config = (WGPUSwapChainDescriptor){
+    .nextInChain =
+        (const WGPUChainedStruct *)&(WGPUSwapChainDescriptorExtras){
+            .chain =
+                (WGPUChainedStruct){
+                    .next = NULL,
+                    .sType = (WGPUSType)WGPUSType_SwapChainDescriptorExtras,
+                },
+            .alphaMode = WGPUCompositeAlphaMode_Auto,
+            .viewFormatCount = 0,
+            .viewFormats = NULL,
+        },
+    .usage = WGPUTextureUsage_RenderAttachment,
+    .format = presentationFormat,
+    .width = 0,
+    .height = 0,
+    .presentMode = WGPUPresentMode_Fifo,
 };
 
-size_t vertices_length = sizeof(vertices)/sizeof(Vertex);
-  
-  const uint64_t vertex_uniform_buffer_size = sizeof(VertexUniform);
-  WGPUBuffer vertex_uniform_buffer = wgpuDeviceCreateBuffer(
-        device, &(WGPUBufferDescriptor){.label = "vertex uniform",
-                                        .size = vertex_uniform_buffer_size,
-                                        .usage = WGPUBufferUsage_Uniform |
-                                                WGPUBufferUsage_CopyDst,
-                                        .mappedAtCreation = false});
-  const uint64_t frag_uniform_buffer_size = sizeof(FragUniform) * vertices_length / 3;
-  WGPUBuffer frag_uniform_buffer = wgpuDeviceCreateBuffer(
-        device, &(WGPUBufferDescriptor){.label = "frag uniform",
-                                        .size = frag_uniform_buffer_size,
-                                        .usage = WGPUBufferUsage_Storage,
-                                        .mappedAtCreation = true});
+glfwGetWindowSize(window, (int *)&config.width, (int *)&config.height);
 
-  WGPUBindGroup bind_group = wgpuDeviceCreateBindGroup(
-      device,
-      &(WGPUBindGroupDescriptor){
-          .label = "bind group for object",
-          .layout = wgpuRenderPipelineGetBindGroupLayout(pipeline, 0),
-          .entries = (WGPUBindGroupEntry[]){{.binding = 0,
-                                             .buffer = vertex_uniform_buffer,
-                                             .size = vertex_uniform_buffer_size,
-                                             .offset = 0},
-                                            {.binding = 1,
-                                             .buffer = frag_uniform_buffer,
-                                             .size = frag_uniform_buffer_size,
-                                             .offset = 0}},
-          .entryCount = 2});
+WGPUSwapChain swap_chain = wgpuDeviceCreateSwapChain(device, surface, &config);
 
-  FragUniform * frag_uniform_mapped = wgpuBufferGetMappedRange(frag_uniform_buffer, 0, sizeof(FragUniform) *  vertices_length / 3);
+WGPUSupportedLimits limits = {};
+bool gotlimits = wgpuDeviceGetLimits(device, &limits);
 
-  FragUniform tmp_frag_ubo[] = {{.type = 1}, {.type = 0}, {.type = 2}};
+WGPUTexture depth_texture = NULL;
 
-  memcpy(frag_uniform_mapped, tmp_frag_ubo, sizeof(tmp_frag_ubo));
-  wgpuBufferUnmap(frag_uniform_buffer);
-
-  const WGPUBuffer vertex_buffer = wgpuDeviceCreateBuffer(
-      device, &(WGPUBufferDescriptor){.label = "vertex buffer vertices",
-                                      .size = sizeof(vertices),
-                                      .usage = WGPUBufferUsage_Vertex |
-                                               WGPUBufferUsage_CopyDst,
-                                      .mappedAtCreation = false});
-  wgpuQueueWriteBuffer(queue, vertex_buffer, 0, vertices,
-
-                       sizeof(vertices));
-
-
-  WGPUSwapChainDescriptor config = (WGPUSwapChainDescriptor){
-      .nextInChain =
-          (const WGPUChainedStruct *)&(WGPUSwapChainDescriptorExtras){
-              .chain =
-                  (WGPUChainedStruct){
-                      .next = NULL,
-                      .sType = (WGPUSType)WGPUSType_SwapChainDescriptorExtras,
-                  },
-              .alphaMode = WGPUCompositeAlphaMode_Auto,
-              .viewFormatCount = 0,
-              .viewFormats = NULL,
-          },
-      .usage = WGPUTextureUsage_RenderAttachment,
-      .format = presentationFormat,
-      .width = 0,
-      .height = 0,
-      .presentMode = WGPUPresentMode_Fifo,
-  };
-
-  glfwGetWindowSize(window, (int *)&config.width, (int *)&config.height);
-
-  WGPUSwapChain swap_chain = wgpuDeviceCreateSwapChain(device, surface, &config);
-
-  WGPUSupportedLimits limits = {};
-  bool gotlimits = wgpuDeviceGetLimits(device, &limits);
-  
-
-  WGPUTexture depth_texture = NULL;
-  
-  while (!glfwWindowShouldClose(window)) {
+while (!glfwWindowShouldClose(window)) {
 
     WGPUTextureView view = NULL;
 
@@ -375,17 +460,7 @@ size_t vertices_length = sizeof(vertices)/sizeof(Vertex);
         wgpuCommandEncoderBeginRenderPass(encoder, &render_pass_descriptor);
     wgpuRenderPassEncoderSetPipeline(pass, pipeline);
     wgpuRenderPassEncoderSetVertexBuffer(pass, 0, vertex_buffer, 0,
-                                         sizeof(vertices));
-    VertexUniform ubos[] = {{.mat = {}}};
-    mat4 proj = {};
-    mat4 translation = {};
-    glm_ortho(0, (float)window_width, 0, (float)window_height, -100, 100, proj);
-    glm_mat4_identity(translation);
-    glm_translate(translation, (float[]){-1, -1, 0});
-    glm_mat4_mul(proj, translation, ubos[0].mat);
-
-    wgpuQueueWriteBuffer(queue, vertex_uniform_buffer, 0, ubos,
-                         vertex_uniform_buffer_size);
+                                         app.vertices_size);
 
     wgpuRenderPassEncoderSetBindGroup(pass, 0, bind_group, 0, NULL);
     wgpuRenderPassEncoderDraw(pass, vertices_length, 1, 0, 0);

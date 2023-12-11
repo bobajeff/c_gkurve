@@ -43,10 +43,17 @@ add_compile_definitions(RESOURCE_DIR="${CMAKE_SOURCE_DIR}/")
 
 add_subdirectory(helpers)
 
+#--------------DRAW
+add_library(draw
+draw.c
+)
+target_link_libraries(draw PRIVATE wgpu_native cglm)
+target_include_directories(draw PUBLIC ${CMAKE_SOURCE_DIR})
+
 #--------------GKURVE
 add_executable(gkurve
 main.c
 )
-target_link_libraries(gkurve PRIVATE glfw wgpu_native create_surface framework cglm)
+target_link_libraries(gkurve PRIVATE glfw wgpu_native create_surface framework cglm draw)
 
 
