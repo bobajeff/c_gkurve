@@ -148,18 +148,18 @@ int main(int argc, char *argv[]) {
           },
       });
 
-int window_width, window_height;
-glfwGetWindowSize(window, (int *)&window_width, (int *)&window_height);
-App app = {};
+int window_width_i, window_height_i;
+glfwGetWindowSize(window, (int *)&window_width_i, (int *)&window_height_i);
 
-#define WINDOW_WIDTH 640.0
-#define WINDOW_HEIGHT 480.0
-// #define TRIANGLE_SCALE 250.0
-// drawEquilateralTriangle(&app, (vec2){ WINDOW_WIDTH / 2, WINDOW_HEIGHT / 2 }, TRIANGLE_SCALE, (FragUniform){.type = GkurveType_Filled, .texture_index = 1, .blend_color = {1,1,1,1}});
-// drawEquilateralTriangle(&app, (vec2){ WINDOW_WIDTH / 2, WINDOW_HEIGHT / 2 - TRIANGLE_SCALE }, TRIANGLE_SCALE, (FragUniform){.type = GkurveType_Concave, .texture_index = 1, .blend_color = {1,1,1,1}});
-// drawEquilateralTriangle(&app, (vec2){ WINDOW_WIDTH / 2 - TRIANGLE_SCALE, WINDOW_HEIGHT / 2 - TRIANGLE_SCALE / 2 }, TRIANGLE_SCALE, (FragUniform){ .type = GkurveType_Convex, .texture_index = 0, .blend_color = {1,1,1,1} });
+App app = {};
+float window_width = (float)window_width_i;
+float window_height = (float)window_height_i;
+// float triangle_scale = 250.0;
+// drawEquilateralTriangle(&app, (vec2){ window_width / 2, window_height / 2 }, triangle_scale, (FragUniform){.type = GkurveType_Filled, .texture_index = 1, .blend_color = {1,1,1,1}});
+// drawEquilateralTriangle(&app, (vec2){ window_width / 2, window_height / 2 - triangle_scale }, triangle_scale, (FragUniform){.type = GkurveType_Concave, .texture_index = 1, .blend_color = {1,1,1,1}});
+// drawEquilateralTriangle(&app, (vec2){ window_width / 2 - triangle_scale, window_height / 2 - triangle_scale / 2 }, triangle_scale, (FragUniform){ .type = GkurveType_Convex, .texture_index = 0, .blend_color = {1,1,1,1} });
 // drawQuad(&app, (vec2){0, 0}, (vec2){200, 200}, (FragUniform){.type = GkurveType_Filled, .texture_index = 1, .blend_color = {1,1,1,1}});
-drawCircle(&app, (vec2){ WINDOW_WIDTH / 2, WINDOW_HEIGHT / 2 }, WINDOW_HEIGHT / 2 - 10, (vec4){ 0, 0.5, 0.75, 1.0 });
+drawCircle(&app, (vec2){ window_width / 2, window_height / 2 }, window_height / 2 - 10, (vec4){ 0, 0.5, 0.75, 1.0 });
 // update_vertex_buffer
 const WGPUBuffer vertex_buffer = wgpuDeviceCreateBuffer(
     device, &(WGPUBufferDescriptor){.label = "vertex buffer vertices",
@@ -181,7 +181,7 @@ WGPUBuffer vertex_uniform_buffer = wgpuDeviceCreateBuffer(
 VertexUniform ubos[] = {{.mat = {}}};
 mat4 proj = {};
 mat4 translation = {};
-glm_ortho(0, (float)window_width, 0, (float)window_height, -100, 100, proj);
+glm_ortho(0, (float)window_width_i, 0, (float)window_height_i, -100, 100, proj);
 glm_mat4_identity(translation);
 glm_translate(translation, (float[]){-1, -1, 0});
 glm_mat4_mul(proj, translation, ubos[0].mat);
@@ -385,23 +385,23 @@ while (!glfwWindowShouldClose(window)) {
     WGPUCommandEncoder encoder = wgpuDeviceCreateCommandEncoder(
         device, &(WGPUCommandEncoderDescriptor){.label = "our encoder"});
 
-    glfwGetWindowSize(window, (int *)&window_width, (int *)&window_height);
+    glfwGetWindowSize(window, (int *)&window_width_i, (int *)&window_height_i);
 
-    window_width = (window_width < limits.limits.maxTextureDimension2D)
-                       ? window_width
+    window_width_i = (window_width_i < limits.limits.maxTextureDimension2D)
+                       ? window_width_i
                        : limits.limits.maxTextureDimension2D;
-    window_height = (window_height < limits.limits.maxTextureDimension2D)
-                        ? window_height
+    window_height_i = (window_height_i < limits.limits.maxTextureDimension2D)
+                        ? window_height_i
                         : limits.limits.maxTextureDimension2D;
 
-    window_width = (window_width > 1) ? window_width : 1;
-    window_height = (window_height > 1) ? window_height : 1;
+    window_width_i = (window_width_i > 1) ? window_width_i : 1;
+    window_height_i = (window_height_i > 1) ? window_height_i : 1;
 
     // If we don't have a depth texture OR if its size is different
     // from the canvasTexture when make a new depth texture
     if (!depth_texture ||
-        wgpuTextureGetWidth(depth_texture) != window_width ||
-        wgpuTextureGetHeight(depth_texture) != window_height) {
+        wgpuTextureGetWidth(depth_texture) != window_width_i ||
+        wgpuTextureGetHeight(depth_texture) != window_height_i) {
       if (depth_texture) {
         wgpuTextureDestroy(depth_texture);
       }
@@ -411,8 +411,8 @@ while (!glfwWindowShouldClose(window)) {
         .usage = WGPUTextureUsage_RenderAttachment,
         .dimension = WGPUTextureDimension_2D,
         .size = (WGPUExtent3D){
-            .width = window_width,
-            .height = window_height,
+            .width = window_width_i,
+            .height = window_height_i,
             .depthOrArrayLayers = 1,
         },
         .format = WGPUTextureFormat_Depth24Plus,
