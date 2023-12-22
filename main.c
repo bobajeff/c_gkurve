@@ -15,6 +15,7 @@
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
 #include "draw.h"
+#include "atlas.h"
 
 int main(int argc, char *argv[]) {
   srand(time(NULL)); // seed random number generator
@@ -151,15 +152,38 @@ int main(int argc, char *argv[]) {
 int window_width_i, window_height_i;
 glfwGetWindowSize(window, (int *)&window_width_i, (int *)&window_height_i);
 
+int img_width, img_height, raw_image_channels;
+unsigned char *img = stbi_load(RESOURCE_DIR "gotta-go-fast.png", &img_width,
+                               &img_height, &raw_image_channels, 4);
+size_t img_data_size = img_width * img_height * 4;
+
+size_t white_tex_scale = 80;
+size_t white_tex_data_size = white_tex_scale * white_tex_scale * 4;
+
+unsigned char *white_texture_data = malloc(white_tex_data_size);
+memset(white_texture_data, 0xff, white_tex_data_size);
+
+ImageData imgs[2] = {
+    {.width = img_width, .height = img_height, .data = img},
+    {.width = white_tex_scale, .height = white_tex_scale, .data = white_texture_data}
+};
+
+Atlas atlas = atlasCreate(imgs, 2, 640);
+stbi_image_free(img);
+free(white_texture_data);
+
+UVData img_uv_data = imgs[0].uv_data;
+UVData white_texture_uv_data = imgs[1].uv_data;
+
 App app = {};
 float window_width = (float)window_width_i;
 float window_height = (float)window_height_i;
-// float triangle_scale = 250.0;
-// drawEquilateralTriangle(&app, (vec2){ window_width / 2, window_height / 2 }, triangle_scale, (FragUniform){.type = GkurveType_Filled, .texture_index = 1, .blend_color = {1,1,1,1}});
-// drawEquilateralTriangle(&app, (vec2){ window_width / 2, window_height / 2 - triangle_scale }, triangle_scale, (FragUniform){.type = GkurveType_Concave, .texture_index = 1, .blend_color = {1,1,1,1}});
-// drawEquilateralTriangle(&app, (vec2){ window_width / 2 - triangle_scale, window_height / 2 - triangle_scale / 2 }, triangle_scale, (FragUniform){ .type = GkurveType_Convex, .texture_index = 0, .blend_color = {1,1,1,1} });
-// drawQuad(&app, (vec2){0, 0}, (vec2){200, 200}, (FragUniform){.type = GkurveType_Filled, .texture_index = 1, .blend_color = {1,1,1,1}});
-drawCircle(&app, (vec2){ window_width / 2, window_height / 2 }, window_height / 2 - 10, (vec4){ 0, 0.5, 0.75, 1.0 });
+float triangle_scale = 250.0;
+// drawEquilateralTriangle(&app, (vec2){ window_width / 2, window_height / 2 }, triangle_scale, (FragUniform){.type = GkurveType_Filled, .blend_color = {1,1,1,1}}, img_uv_data);
+// drawEquilateralTriangle(&app, (vec2){ window_width / 2, window_height / 2 - triangle_scale }, triangle_scale, (FragUniform){.type = GkurveType_Concave, .blend_color = {1,1,1,1}}, img_uv_data);
+// drawEquilateralTriangle(&app, (vec2){ window_width / 2 - triangle_scale, window_height / 2 - triangle_scale / 2 }, triangle_scale, (FragUniform){ .type = GkurveType_Convex, .blend_color = {1,1,1,1} }, white_texture_uv_data);
+// drawQuad(&app, (vec2){0, 0}, (vec2){200, 200}, (FragUniform){.type = GkurveType_Filled, .blend_color = {1,1,1,1}}, img_uv_data);
+drawCircle(&app, (vec2){ window_width / 2, window_height / 2 }, window_height / 2 - 10, (vec4){ 0, 0.5, 0.75, 1.0 }, white_texture_uv_data);
 // update_vertex_buffer
 const WGPUBuffer vertex_buffer = wgpuDeviceCreateBuffer(
     device, &(WGPUBufferDescriptor){.label = "vertex buffer vertices",
@@ -213,21 +237,17 @@ WGPUSampler sampler = wgpuDeviceCreateSampler(
         .maxAnisotropy = 1, //** mystery_setting ** - needs this value to work
     });
 
-int img_width, img_height, raw_image_channels;
-unsigned char *img = stbi_load(RESOURCE_DIR "gotta-go-fast.png", &img_width,
-                               &img_height, &raw_image_channels, 4);
-size_t img_data_size = img_width * img_height * 4;
 
-WGPUTexture quad_texture = wgpuDeviceCreateTexture(
+WGPUTexture texture = wgpuDeviceCreateTexture(
     device,
     &(WGPUTextureDescriptor){
         .nextInChain = NULL,
-        .label = "yellow F on red",
+        .label = "atlas texture",
         .size =
             (WGPUExtent3D){
-                .depthOrArrayLayers = 2, // 2 array layers
-                .width = img_width,
-                .height = img_height},
+                .depthOrArrayLayers = 1,
+                .width = atlas.texture_side_length,
+                .height = atlas.texture_side_length},
         .format = WGPUTextureFormat_RGBA8Unorm,
         .usage = WGPUTextureUsage_TextureBinding | WGPUTextureUsage_CopyDst |
                  WGPUTextureUsage_RenderAttachment,
@@ -239,46 +259,22 @@ WGPUTexture quad_texture = wgpuDeviceCreateTexture(
 
 wgpuQueueWriteTexture(
     queue,
-    &(WGPUImageCopyTexture){.texture = quad_texture,
+    &(WGPUImageCopyTexture){.texture = texture,
                             .nextInChain = NULL,
                             .aspect = WGPUTextureAspect_All,
                             .mipLevel = 0,
-                            .origin = (WGPUOrigin3D){.x = 0, .y = 0, .z = 1}}, // layer 2
-    img, img_data_size,
+                            .origin = (WGPUOrigin3D){.x = 0, .y = 0, .z = 0}},
+    atlas.texture_data, atlas.texture_data_size,
     &(WGPUTextureDataLayout){
-        .bytesPerRow = img_width * 4,
+        .bytesPerRow = atlas.texture_side_length * 4,
         .nextInChain = NULL,
         .offset = 0,
-        .rowsPerImage = img_height,
+        .rowsPerImage = atlas.texture_side_length,
     },
     &(WGPUExtent3D){.depthOrArrayLayers =
                         1, // write one layer
-                    .width = img_width,
-                    .height = img_height});
-
-unsigned char *white_texture_data = malloc(img_data_size);
-memset(white_texture_data, 0xff, img_data_size);
-
-wgpuQueueWriteTexture(
-    queue,
-    &(WGPUImageCopyTexture){.texture = quad_texture,
-                            .nextInChain = NULL,
-                            .aspect = WGPUTextureAspect_All,
-                            .mipLevel = 0,
-                            .origin = (WGPUOrigin3D){.x = 0, .y = 0, .z = 0}}, // layer 1
-    white_texture_data, img_data_size,
-    &(WGPUTextureDataLayout){
-        .bytesPerRow = img_width * 4,
-        .nextInChain = NULL,
-        .offset = 0,
-        .rowsPerImage = img_height,
-    },
-    &(WGPUExtent3D){.depthOrArrayLayers =
-                        1, // write one layer
-                    .width = img_width,
-                    .height = img_height});
-
-stbi_image_free(img);
+                    .width = atlas.texture_side_length,
+                    .height = atlas.texture_side_length});
 
 WGPUBindGroup bind_group = wgpuDeviceCreateBindGroup(
     device,
@@ -305,17 +301,17 @@ WGPUBindGroup bind_group = wgpuDeviceCreateBindGroup(
                  .size = 0,
                  .offset = 0,
                  .textureView = wgpuTextureCreateView(
-                     quad_texture,
+                     texture,
                      &(WGPUTextureViewDescriptor){
                          .nextInChain = NULL,
                          .label = NULL,
                          .format = WGPUTextureFormat_Undefined,
-                         .dimension = WGPUTextureViewDimension_2DArray,
+                         .dimension = WGPUTextureViewDimension_2D,
                          .baseMipLevel = 0,
                          .mipLevelCount = 1, //** mystery_setting ** - needs
                                              // this value to work
                          .baseArrayLayer = 0,
-                         .arrayLayerCount = 2, // 2 array layers
+                         .arrayLayerCount = 1,
                          // this value to work
                          .aspect = WGPUTextureAspect_All,
                      })},

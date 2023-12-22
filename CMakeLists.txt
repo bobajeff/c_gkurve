@@ -50,10 +50,17 @@ draw.c
 target_link_libraries(draw PRIVATE wgpu_native cglm)
 target_include_directories(draw PUBLIC ${CMAKE_SOURCE_DIR})
 
+#--------------ATLAS
+add_library(atlas
+atlas.c
+)
+target_link_libraries(atlas PRIVATE wgpu_native cglm)
+target_include_directories(atlas PUBLIC ${CMAKE_SOURCE_DIR})
+
 #--------------GKURVE
 add_executable(gkurve
 main.c
 )
-target_link_libraries(gkurve PRIVATE glfw wgpu_native create_surface framework cglm draw)
+target_link_libraries(gkurve PRIVATE glfw wgpu_native create_surface framework cglm draw atlas)
 
 

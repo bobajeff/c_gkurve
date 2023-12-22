@@ -4,15 +4,22 @@
 #include <stdlib.h>
 #include <string.h>
 
-void drawEquilateralTriangle(App * app, vec2 position, float scale, FragUniform uniform){
+void drawEquilateralTriangle(App * app, vec2 position, float scale, FragUniform uniform, UVData uv_data){
     float triangle_height = scale * sqrtf(0.75);
 
     Vertex vertices[] = {
-        { .pos = { position[0] + scale / 2, position[1] + triangle_height, 0, 1 }, .uv = { 0.5, 1 } },
-        { .pos = { position[0], position[1], 0, 1 }, .uv = { 0, 0 } },
-        { .pos = { position[0] + scale, position[1], 0, 1 }, .uv = { 1, 0 } },
+        { .pos = { position[0] + scale / 2, position[1] + triangle_height, 0, 1 }},
+        { .pos = { position[0], position[1], 0, 1 }},
+        { .pos = { position[0] + scale, position[1], 0, 1 }},
     };
-    
+    // calculate and add uv_data
+    vec2 temp;
+    glm_vec2_mul(uv_data.width_and_height, (vec2){0.5, 1}, temp);
+    glm_vec2_add(temp, uv_data.bottom_left, vertices[0].uv);
+    glm_vec2_copy(uv_data.bottom_left, vertices[1].uv);
+    glm_vec2_mul(uv_data.width_and_height, (vec2){1, 0 }, temp);
+    glm_vec2_add(temp, uv_data.bottom_left, vertices[2].uv);
+
     // append to app data
     if (app->vertices == NULL){
         app->vertices = malloc(sizeof(vertices));
@@ -37,18 +44,38 @@ void drawEquilateralTriangle(App * app, vec2 position, float scale, FragUniform 
     };
 };
 
-void drawQuad(App * app, vec2 position, vec2 scale, FragUniform uniform){
+void drawQuad(App * app, vec2 position, vec2 scale, FragUniform uniform, UVData uv_data){
     Vertex vertices[] = {
-        { .pos = { position[0], position[1] + scale[1], 0, 1 }, .uv = { 0, 1 } },
-        { .pos = { position[0], position[1], 0, 1 }, .uv = { 0, 0 } },
-        { .pos = { position[0] + scale[0], position[1], 0, 1 }, .uv = { 1, 0 } },
+        { .pos = { position[0], position[1] + scale[1], 0, 1 }},
+        { .pos = { position[0], position[1], 0, 1 }},
+        { .pos = { position[0] + scale[0], position[1], 0, 1 }},
 
-        { .pos = { position[0], position[1] + scale[1], 0, 1 }, .uv = { 0, 1 } },
-        { .pos = { position[0] + scale[0], position[1] + scale[1], 0, 1 }, .uv = { 1, 1 } },
-        { .pos = { position[0] + scale[0], position[1], 0, 1 }, .uv = { 1, 0 } },
+        { .pos = { position[0] + scale[0], position[1] + scale[1], 0, 1 }},
+        { .pos = { position[0], position[1] + scale[1], 0, 1 }},
+        { .pos = { position[0] + scale[0], position[1], 0, 1 }},
     };
-    FragUniform fragment_uniform_list[] = {uniform, uniform};
 
+    vec2 temp;
+
+    vec2 bottom_right_uv;
+    vec2 up_left_uv;
+    vec2 up_right_uv;
+
+    glm_vec2_add(uv_data.bottom_left, uv_data.width_and_height, up_right_uv);
+    glm_vec2_mul(uv_data.width_and_height, (vec2){1, 0}, temp);
+    glm_vec2_add(uv_data.bottom_left, temp, bottom_right_uv);
+    glm_vec2_mul(uv_data.width_and_height, (vec2){0, 1}, temp);
+    glm_vec2_add(uv_data.bottom_left, temp, up_left_uv);
+
+    glm_vec2_copy(up_left_uv, vertices[0].uv);
+    glm_vec2_copy(uv_data.bottom_left, vertices[1].uv);
+    glm_vec2_copy(bottom_right_uv, vertices[2].uv);
+
+    glm_vec2_copy(up_right_uv, vertices[3].uv);
+    glm_vec2_copy(up_left_uv, vertices[4].uv);
+    glm_vec2_copy(bottom_right_uv, vertices[5].uv);
+
+    FragUniform fragment_uniform_list[] = {uniform, uniform};
 
     // append to app data
     if (app->vertices == NULL){
@@ -74,47 +101,64 @@ void drawQuad(App * app, vec2 position, vec2 scale, FragUniform uniform){
     };
 };
 
-void drawCircle(App * app, vec2 position, float radius, vec4 blend_color){
+void drawCircle(App * app, vec2 position, float radius, vec4 blend_color, UVData uv_data){
 
-    #define LOW_MID { position[0], position[1] - radius, 0, 1 }
-    #define HIGH_MID { position[0], position[1] + radius, 0, 1 }
+    vec2 temp;
 
-    #define MID_LEFT { position[0] - radius, position[1], 0, 1 }
-    #define MID_RIGHT { position[0] + radius, position[1], 0, 1 }
+    Vertex low_mid = {.pos = {position[0], position[1] - radius, 0, 1}};
+    glm_vec2_mul(uv_data.width_and_height, (vec2){0.5, 0}, temp);
+    glm_vec2_add(uv_data.bottom_left, temp, low_mid.uv);
+    Vertex high_mid = {.pos = {position[0], position[1] + radius, 0, 1}};
+    glm_vec2_mul(uv_data.width_and_height, (vec2){0.5, 1}, temp);
+    glm_vec2_add(uv_data.bottom_left, temp, high_mid.uv);
+    Vertex mid_left = {.pos = {position[0] - radius, position[1], 0, 1}};
+    glm_vec2_mul(uv_data.width_and_height, (vec2){0, 0.5}, temp);
+    glm_vec2_add(uv_data.bottom_left, temp, mid_left.uv);
+    Vertex mid_right = {.pos = {position[0] + radius, position[1], 0, 1}};
+    glm_vec2_mul(uv_data.width_and_height, (vec2){1, 0.5}, temp);
+    glm_vec2_add(uv_data.bottom_left, temp, mid_right.uv);
 
     float p = 0.95 * radius;
 
-    #define HIGH_RIGHT { position[0] + p, position[1] + p, 0, 1 }
-    #define HIGH_LEFT { position[0] - p, position[1] + p, 0, 1 }
-    #define LOW_RIGHT { position[0] + p, position[1] - p, 0, 1 }
-    #define LOW_LEFT { position[0] - p, position[1] - p, 0, 1 }
+    Vertex high_right = {.pos = {position[0] + p, position[1] + p, 0, 1}};
+    glm_vec2_mul(uv_data.width_and_height, (vec2){1, 0.75}, temp);
+    glm_vec2_add(uv_data.bottom_left, temp, high_right.uv);
+    Vertex high_left = {.pos = {position[0] - p, position[1] + p, 0, 1}};
+    glm_vec2_mul(uv_data.width_and_height, (vec2){0, 0.75}, temp);
+    glm_vec2_add(uv_data.bottom_left, temp, high_left.uv);
+    Vertex low_right = {.pos = {position[0] + p, position[1] - p, 0, 1}};
+    glm_vec2_mul(uv_data.width_and_height, (vec2){1, 0.25}, temp);
+    glm_vec2_add(uv_data.bottom_left, temp, low_right.uv);
+    Vertex low_left = {.pos = {position[0] - p, position[1] - p, 0, 1}};
+    glm_vec2_mul(uv_data.width_and_height, (vec2){0, 0.25}, temp);
+    glm_vec2_add(uv_data.bottom_left, temp, low_left.uv);
 
     #define BLEND_COLOR {blend_color[0], blend_color[1], blend_color[2], blend_color[3]}
 
     Vertex vertices[] = {
-        { .pos = LOW_MID, .uv = { 0.5, 0 } },
-        { .pos = MID_RIGHT, .uv = { 0.5, 0 } },
-        { .pos = HIGH_MID, .uv = { 0.5, 0 } },
+        low_mid,
+        mid_right,
+        high_mid,
 
-        { .pos = HIGH_MID, .uv = { 0.5, 0 } },
-        { .pos = MID_LEFT, .uv = { 0.5, 0 } },
-        { .pos = LOW_MID, .uv = { 0.5, 0 } },
+        high_mid,
+        mid_left,
+        low_mid,
 
-        { .pos = LOW_RIGHT, .uv = { 0.5, 0 } },
-        { .pos = MID_RIGHT, .uv = { 0.5, 0 } },
-        { .pos = LOW_MID, .uv = { 0.5, 0 } },
+        low_right,
+        mid_right,
+        low_mid,
 
-        { .pos = HIGH_RIGHT, .uv = { 0.5, 0 } },
-        { .pos = HIGH_MID, .uv = { 0.5, 0 } },
-        { .pos = MID_RIGHT, .uv = { 0.5, 0 } },
+        high_right,
+        high_mid,
+        mid_right,
 
-        { .pos = HIGH_LEFT, .uv = { 0.5, 0 } },
-        { .pos = MID_LEFT, .uv = { 0.5, 0 } },
-        { .pos = HIGH_MID, .uv = { 0.5, 0 } },
+        high_left,
+        mid_left,
+        high_mid,
 
-        { .pos = LOW_LEFT, .uv = { 0.5, 0 } },
-        { .pos = LOW_MID, .uv = { 0.5, 0 } },
-        { .pos = MID_LEFT, .uv = { 0.5, 0 } },
+        low_left,
+        low_mid,
+        mid_left
     };
 
     FragUniform fragment_uniform_list[] = {
@@ -165,7 +209,4 @@ void drawCircle(App * app, vec2 position, float radius, vec4 blend_color){
         app->fragment_uniform_list_size += sizeof(fragment_uniform_list);
         memcpy(&app->fragment_uniform_list[offset], fragment_uniform_list, sizeof(fragment_uniform_list));
     };
-
-
-
 }

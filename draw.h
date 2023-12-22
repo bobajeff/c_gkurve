@@ -4,6 +4,7 @@
 #include <stddef.h>
 #include <sys/types.h>
 #include "webgpu.h"
+#include "atlas.h"
 typedef struct Vertex {
   vec4 pos;
   vec2 uv;
@@ -23,10 +24,9 @@ typedef enum GkurveType {
 
 typedef struct FragUniform {
     GkurveType type;
-    int texture_index;
-    // Padding for struct alignment to 16 bytes (minimum in WebGPU uniform).
-    vec2 padding;
     vec4 blend_color;
+    // Padding for struct alignment to 16 bytes (minimum in WebGPU uniform).
+    vec3 padding;
 } FragUniform;
 
 typedef struct App {
@@ -36,9 +36,9 @@ typedef struct App {
   size_t fragment_uniform_list_size;
 } App;
 
-void drawEquilateralTriangle(App * app, vec2 position, float scale, FragUniform uniform);
+void drawEquilateralTriangle(App * app, vec2 position, float scale, FragUniform uniform, UVData uv_data);
 
-void drawQuad(App * app, vec2 position, vec2 scale, FragUniform uniform);
+void drawQuad(App * app, vec2 position, vec2 scale, FragUniform uniform, UVData uv_data);
 
-void drawCircle(App * app, vec2 position, float radius, vec4 blend_color);
+void drawCircle(App * app, vec2 position, float radius, vec4 blend_color, UVData uv_data);
 #endif // DRAW_H_
