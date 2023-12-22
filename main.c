@@ -111,8 +111,8 @@ int main(int argc, char *argv[]) {
                               &(WGPUBlendState){
                                   .color =
                                       (WGPUBlendComponent){
-                                          .srcFactor = WGPUBlendFactor_One,
-                                          .dstFactor = WGPUBlendFactor_Zero,
+                                          .srcFactor = WGPUBlendFactor_SrcAlpha,
+                                          .dstFactor = WGPUBlendFactor_OneMinusSrcAlpha,
                                           .operation = WGPUBlendOperation_Add,
                                       },
                                   .alpha =
