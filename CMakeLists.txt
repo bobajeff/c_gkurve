@@ -39,6 +39,9 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(cglm)
 
+#--------------FREETYPE
+find_package(Freetype REQUIRED)
+
 add_compile_definitions(RESOURCE_DIR="${CMAKE_SOURCE_DIR}/")
 
 add_subdirectory(helpers)
@@ -57,10 +60,17 @@ atlas.c
 target_link_libraries(atlas PRIVATE wgpu_native cglm)
 target_include_directories(atlas PUBLIC ${CMAKE_SOURCE_DIR})
 
+#--------------LABEL
+add_library(label
+label.c
+)
+target_link_libraries(label PRIVATE wgpu_native cglm freetype)
+target_include_directories(label PUBLIC ${CMAKE_SOURCE_DIR} ${FREETYPE_INCLUDE_DIRS})
+
 #--------------GKURVE
 add_executable(gkurve
 main.c
 )
-target_link_libraries(gkurve PRIVATE glfw wgpu_native create_surface framework cglm draw atlas)
+target_link_libraries(gkurve PRIVATE glfw wgpu_native create_surface framework cglm draw atlas label)
 
 

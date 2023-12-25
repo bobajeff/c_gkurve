@@ -16,6 +16,7 @@
 #include "stb_image.h"
 #include "draw.h"
 #include "atlas.h"
+#include "label.h"
 
 int main(int argc, char *argv[]) {
   srand(time(NULL)); // seed random number generator
@@ -162,13 +163,14 @@ size_t white_tex_data_size = white_tex_scale * white_tex_scale * 4;
 
 unsigned char *white_texture_data = malloc(white_tex_data_size);
 memset(white_texture_data, 0xff, white_tex_data_size);
+size_t num_imgs = 2;
+ImageData * imgs = malloc(sizeof(ImageData) * num_imgs);
+imgs[0] = (ImageData){.width = img_width, .height = img_height, .data = img};
+imgs[1] = (ImageData){.width = white_tex_scale, .height = white_tex_scale, .data = white_texture_data};
+GlyphInfo * glyph_info = labelInit(RESOURCE_DIR "FiraSans-Regular.ttf", 40, &imgs, &num_imgs);
 
-ImageData imgs[2] = {
-    {.width = img_width, .height = img_height, .data = img},
-    {.width = white_tex_scale, .height = white_tex_scale, .data = white_texture_data}
-};
+Atlas atlas = atlasCreate(imgs, num_imgs, 1280);
 
-Atlas atlas = atlasCreate(imgs, 2, 640);
 stbi_image_free(img);
 free(white_texture_data);
 
@@ -179,6 +181,7 @@ App app = {};
 float window_width = (float)window_width_i;
 float window_height = (float)window_height_i;
 float triangle_scale = 250.0;
+drawLabel(&app, glyph_info, imgs, "All your game's bases are belong to us", (vec2){0, 420}, (vec4){1, 1, 1, 1});
 // drawEquilateralTriangle(&app, (vec2){ window_width / 2, window_height / 2 }, triangle_scale, (FragUniform){.type = GkurveType_Filled, .blend_color = {1,1,1,1}}, img_uv_data);
 // drawEquilateralTriangle(&app, (vec2){ window_width / 2, window_height / 2 - triangle_scale }, triangle_scale, (FragUniform){.type = GkurveType_Concave, .blend_color = {1,1,1,1}}, img_uv_data);
 // drawEquilateralTriangle(&app, (vec2){ window_width / 2 - triangle_scale, window_height / 2 - triangle_scale / 2 }, triangle_scale, (FragUniform){ .type = GkurveType_Convex, .blend_color = {1,1,1,1} }, white_texture_uv_data);
