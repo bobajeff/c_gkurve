@@ -18,7 +18,7 @@
 #include "atlas.h"
 #include "label.h"
 #include "resizable_label.h"
-
+#include <unistd.h>
 
 #define DEMOMODE_GKURVES 0
 #define DEMOMODE_BITMAP_TEXT 0
@@ -26,8 +26,27 @@
 #define DEMOMODE_QUAD 0
 #define DEMOMODE_CIRCLE 0
 
+int fileCheck(char * file_address){
+    if (access(file_address, F_OK) == 0) {
+        return 0;
+    } else {
+        return -1;
+    }
+}
+
 
 int main(int argc, char *argv[]) {
+  int file_check = fileCheck(RESOURCE_DIR "gotta-go-fast.png");
+  if (file_check == -1){
+    fprintf(stderr, RESOURCE_DIR "gotta-go-fast.png doesn't exist\n");
+    return 0;
+  }
+  file_check = fileCheck(RESOURCE_DIR "FiraSans-Regular.ttf");
+  if (file_check == -1){
+    fprintf(stderr, RESOURCE_DIR "FiraSans-Regular.ttf doesn't exist\n");
+    return 0;
+  }
+
   srand(time(NULL)); // seed random number generator
 
   initializeLog();
