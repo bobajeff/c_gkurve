@@ -39,6 +39,14 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(cglm)
 
+
+#--------------LIBTESS2
+FetchContent_Declare(
+        libtess2
+        GIT_REPOSITORY https://github.com/bobajeff/libtess2
+)
+FetchContent_MakeAvailable(libtess2)
+
 #--------------FREETYPE
 find_package(Freetype REQUIRED)
 
@@ -46,11 +54,18 @@ add_compile_definitions(RESOURCE_DIR="${CMAKE_SOURCE_DIR}/")
 
 add_subdirectory(helpers)
 
+#--------------MEMORY_ALLOC_HELPERS
+add_library(memory_alloc_helpers
+memory_alloc_helpers.c
+)
+target_link_libraries(memory_alloc_helpers PRIVATE cglm wgpu_native)
+target_include_directories(memory_alloc_helpers PUBLIC ${CMAKE_SOURCE_DIR})
+
 #--------------DRAW
 add_library(draw
 draw.c
 )
-target_link_libraries(draw PRIVATE wgpu_native cglm)
+target_link_libraries(draw PRIVATE wgpu_native cglm memory_alloc_helpers)
 target_include_directories(draw PUBLIC ${CMAKE_SOURCE_DIR})
 
 #--------------ATLAS
@@ -64,13 +79,27 @@ target_include_directories(atlas PUBLIC ${CMAKE_SOURCE_DIR})
 add_library(label
 label.c
 )
-target_link_libraries(label PRIVATE wgpu_native cglm freetype)
+target_link_libraries(label PRIVATE wgpu_native cglm freetype draw)
 target_include_directories(label PUBLIC ${CMAKE_SOURCE_DIR} ${FREETYPE_INCLUDE_DIRS})
+
+#--------------TRIANGULATE_POLYGON
+add_library(triangulate_polygon
+triangulate_polygon.c
+)
+target_link_libraries(triangulate_polygon PRIVATE libtess2 cglm memory_alloc_helpers)
+target_include_directories(triangulate_polygon PUBLIC ${CMAKE_SOURCE_DIR} ${FREETYPE_INCLUDE_DIRS} libtess2 cglm)
+
+#--------------RESIZABLE_LABEL
+add_library(resizable_label
+resizable_label.c
+)
+target_link_libraries(resizable_label PRIVATE wgpu_native cglm freetype memory_alloc_helpers triangulate_polygon)
+target_include_directories(resizable_label PUBLIC ${CMAKE_SOURCE_DIR} ${FREETYPE_INCLUDE_DIRS})
 
 #--------------GKURVE
 add_executable(gkurve
 main.c
 )
-target_link_libraries(gkurve PRIVATE glfw wgpu_native create_surface framework cglm draw atlas label)
+target_link_libraries(gkurve PRIVATE glfw wgpu_native create_surface framework cglm draw atlas label resizable_label)
 
 

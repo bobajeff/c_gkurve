@@ -42,13 +42,16 @@ Atlas atlasCreate(ImageData *imgs, size_t num_imgs, size_t texture_side_length) 
       memcpy(&texture_data[tex_offset],
              &imgs[image_idx].data[data_offset], width * PIXEL_SIZE);
     }
-    imgs[image_idx].uv_data = (UVData){
-        .bottom_left = {(float)x / (float)texture_side_length,
-                        ((float)texture_side_length - ((float)y + (float)height)) /
-                            (float)texture_side_length},
-        .width_and_height = {(float)width / (float)texture_side_length,
-                             (float)height / (float)texture_side_length},
-    };
+    if (imgs[image_idx].padded){
+      stbrp_rect padded_rect = rects[i];
+      padded_rect.x += 1;
+      padded_rect.y += 1;
+      padded_rect.w -= 2;
+      padded_rect.h -= 2;
+      imgs[image_idx].uv = calculateUV(padded_rect, texture_side_length);
+    } else {
+      imgs[image_idx].uv = calculateUV(rects[i], texture_side_length);
+    }
   };
   free(rects);
   return (Atlas){texture_data, texture_data_size, texture_side_length};
@@ -56,4 +59,18 @@ Atlas atlasCreate(ImageData *imgs, size_t num_imgs, size_t texture_side_length) 
 
 void atlasDestroy(Atlas atlas) {
   free(atlas.texture_data);
+};
+
+AtlasUV calculateUV(stbrp_rect rect, size_t texture_side_length) {
+  AtlasUV uv = {
+      .x = (float)rect.x,
+      .y = (float)rect.y,
+      .width = (float)rect.w,
+      .height = (float)rect.h,
+  };
+  uv.x /= (float)texture_side_length;
+  uv.y /= (float)texture_side_length;
+  uv.width /= (float)texture_side_length;
+  uv.height /= (float)texture_side_length;
+  return uv;
 };

@@ -17,6 +17,15 @@
 #include "draw.h"
 #include "atlas.h"
 #include "label.h"
+#include "resizable_label.h"
+
+
+#define DEMOMODE_GKURVES 0
+#define DEMOMODE_BITMAP_TEXT 0
+#define DEMOMODE_TEXT 1
+#define DEMOMODE_QUAD 0
+#define DEMOMODE_CIRCLE 0
+
 
 int main(int argc, char *argv[]) {
   srand(time(NULL)); // seed random number generator
@@ -165,38 +174,62 @@ unsigned char *white_texture_data = malloc(white_tex_data_size);
 memset(white_texture_data, 0xff, white_tex_data_size);
 size_t num_imgs = 2;
 ImageData * imgs = malloc(sizeof(ImageData) * num_imgs);
-imgs[0] = (ImageData){.width = img_width, .height = img_height, .data = img};
-imgs[1] = (ImageData){.width = white_tex_scale, .height = white_tex_scale, .data = white_texture_data};
+imgs[0] = (ImageData){.width = img_width, .height = img_height, .data = img, .padded = false};
+imgs[1] = (ImageData){.width = white_tex_scale, .height = white_tex_scale, .data = white_texture_data, .padded = false};
+#if DEMOMODE_BITMAP_TEXT
 GlyphInfo * glyph_info = labelInit(RESOURCE_DIR "FiraSans-Regular.ttf", 40, &imgs, &num_imgs);
-
-Atlas atlas = atlasCreate(imgs, num_imgs, 1280);
+#endif
+#if DEMOMODE_TEXT
+ResizableFontData rfdata = resizableFontDataGenerate(RESOURCE_DIR "FiraSans-Regular.ttf");
+#endif
+size_t texture_side_length = 1280;
+Atlas atlas = atlasCreate(imgs, num_imgs, texture_side_length);
 
 stbi_image_free(img);
 free(white_texture_data);
 
-UVData img_uv_data = imgs[0].uv_data;
-UVData white_texture_uv_data = imgs[1].uv_data;
+AtlasUV img_uv_data = imgs[0].uv;
+AtlasUV white_texture_uv_data = imgs[1].uv;
 
-App app = {};
+App app = {
+    .fragment_uniform_list = fragUniformBufferInit(),
+    .vertices = vertexBufferInit()
+};
 float window_width = (float)window_width_i;
 float window_height = (float)window_height_i;
 float triangle_scale = 250.0;
+
+
+
+#if DEMOMODE_GKURVES
+drawEquilateralTriangle(&app, (vec2){ window_width / 2, window_height / 1.9  }, triangle_scale, (FragUniform){.type = GkurveType_Triangle, .blend_color = {1,1,1,1}}, img_uv_data, 1.0);
+drawEquilateralTriangle(&app, (vec2){ window_width / 2, window_height / 1.9 - triangle_scale }, triangle_scale, (FragUniform){.type = GkurveType_QuadraticConcave, .blend_color = {1,1,1,1}}, img_uv_data, 1.0);
+drawEquilateralTriangle(&app, (vec2){ window_width / 2 - triangle_scale, window_height / 1.9 }, triangle_scale, (FragUniform){ .type = GkurveType_QuadraticConvex, .blend_color = {1,1,1,1} }, white_texture_uv_data, 1.0);
+drawEquilateralTriangle(&app, (vec2){ window_width / 2 - triangle_scale, window_height / 1.9 - triangle_scale }, triangle_scale, (FragUniform){ .type = GkurveType_QuadraticConvex, .blend_color = {1,1,1,1} }, white_texture_uv_data, 0.5);
+#elif DEMOMODE_BITMAP_TEXT
 drawLabel(&app, glyph_info, imgs, "All your game's bases are belong to us", (vec2){0, 420}, (vec4){1, 1, 1, 1});
-// drawEquilateralTriangle(&app, (vec2){ window_width / 2, window_height / 2 }, triangle_scale, (FragUniform){.type = GkurveType_Filled, .blend_color = {1,1,1,1}}, img_uv_data);
-// drawEquilateralTriangle(&app, (vec2){ window_width / 2, window_height / 2 - triangle_scale }, triangle_scale, (FragUniform){.type = GkurveType_Concave, .blend_color = {1,1,1,1}}, img_uv_data);
-// drawEquilateralTriangle(&app, (vec2){ window_width / 2 - triangle_scale, window_height / 2 - triangle_scale / 2 }, triangle_scale, (FragUniform){ .type = GkurveType_Convex, .blend_color = {1,1,1,1} }, white_texture_uv_data);
-// drawQuad(&app, (vec2){0, 0}, (vec2){200, 200}, (FragUniform){.type = GkurveType_Filled, .blend_color = {1,1,1,1}}, img_uv_data);
+drawLabel(&app, glyph_info, imgs, "wow!", (vec2){70 * 5, 70 }, (vec4){1, 1, 1, 1});
+#elif DEMOMODE_TEXT
+drawResizableLabel(&app, rfdata, "Gotta-go-fast!\n0123456789\n~!@#$%^&*()_+\n:\"<>?`-=[];',./", (vec4){20, 300, 0, 0}, (vec4){1, 1, 1, 1}, 20 * 5, white_texture_uv_data);
+resizableFontDataDestroy(rfdata);
+#elif DEMOMODE_QUAD
+// drawQuad(&app, (vec2){0, 0}, (vec2){480, 480}, (FragUniform){.type = GkurveType_Triangle, .blend_color = {1,1,1,1}}, (AtlasUV){ .x = 0, .y = 0, .width = 1, .height = 1 });
+drawQuad(&app, (vec2){0, 0}, (vec2){200, 200}, (FragUniform){.type = GkurveType_Triangle, .blend_color = {1,1,1,1}}, img_uv_data);
+#elif DEMOMODE_CIRCLE
 drawCircle(&app, (vec2){ window_width / 2, window_height / 2 }, window_height / 2 - 10, (vec4){ 0, 0.5, 0.75, 1.0 }, white_texture_uv_data);
+#endif
+
 // update_vertex_buffer
+size_t vertices_size = app.vertices.length * sizeof(Vertex);
 const WGPUBuffer vertex_buffer = wgpuDeviceCreateBuffer(
     device, &(WGPUBufferDescriptor){.label = "vertex buffer vertices",
-                                    .size = app.vertices_size,
+                                    .size = vertices_size,
                                     .usage = WGPUBufferUsage_Vertex |
                                              WGPUBufferUsage_CopyDst,
                                     .mappedAtCreation = false});
-wgpuQueueWriteBuffer(queue, vertex_buffer, 0, app.vertices, app.vertices_size);
+wgpuQueueWriteBuffer(queue, vertex_buffer, 0, app.vertices.items, vertices_size);
 
-size_t vertices_length = app.vertices_size / sizeof(Vertex);
+size_t vertices_length = app.vertices.length;
 // update_vertex_uniform_buffer
 size_t vertex_uniform_buffer_size = sizeof(VertexUniform);
 WGPUBuffer vertex_uniform_buffer = wgpuDeviceCreateBuffer(
@@ -221,7 +254,7 @@ WGPUBuffer frag_uniform_buffer = wgpuDeviceCreateBuffer(
                                     .usage = WGPUBufferUsage_Storage |
                                              WGPUBufferUsage_CopyDst,
                                     .mappedAtCreation = false});
-wgpuQueueWriteBuffer(queue, frag_uniform_buffer, 0, app.fragment_uniform_list, frag_uniform_buffer_size);
+wgpuQueueWriteBuffer(queue, frag_uniform_buffer, 0, app.fragment_uniform_list.items, frag_uniform_buffer_size);
 
 WGPUSampler sampler = wgpuDeviceCreateSampler(
     device,
@@ -459,7 +492,7 @@ while (!glfwWindowShouldClose(window)) {
         wgpuCommandEncoderBeginRenderPass(encoder, &render_pass_descriptor);
     wgpuRenderPassEncoderSetPipeline(pass, pipeline);
     wgpuRenderPassEncoderSetVertexBuffer(pass, 0, vertex_buffer, 0,
-                                         app.vertices_size);
+                                         vertices_size);
 
     wgpuRenderPassEncoderSetBindGroup(pass, 0, bind_group, 0, NULL);
     wgpuRenderPassEncoderDraw(pass, vertices_length, 1, 0, 0);

@@ -50,20 +50,27 @@ GlyphInfo * labelInit(char * font_path, int char_size, ImageData **imgs, size_t 
         FT_Bitmap glyph_bitmap = glyph->bitmap;
         unsigned int glyph_width = glyph_bitmap.width;
         unsigned int glyph_height = glyph_bitmap.rows;
+        unsigned int pad_width = glyph_width + 2;
+        unsigned int pad_height = glyph_height + 2;
         unsigned char * glyph_buffer = glyph_bitmap.buffer;
         unsigned int pixel_y, pixel_x;
-        RGBA8_Pixel * rgba_buffer = malloc(glyph_width * glyph_height * 4);
-        for (pixel_y = 0; pixel_y < glyph_height; pixel_y++){
-            for (pixel_x = 0; pixel_x < glyph_width; pixel_x++){
-                unsigned int pixel_index = (pixel_y * glyph_width) + pixel_x;
-                unsigned char pixel_value = glyph_buffer[pixel_index];
+        // Add 1 pixel padding to texture to avoid bleeding over other textures
+        RGBA8_Pixel * rgba_buffer = malloc(pad_width * pad_height * 4);
+        for (pixel_y = 0; pixel_y < pad_height; pixel_y++){
+            for (pixel_x = 0; pixel_x < pad_width; pixel_x++){
+                unsigned int pixel_index = (pixel_y * pad_width) + pixel_x;
+                unsigned char pixel_value = 0;
+                if (!(pixel_x == 0 || pixel_x == (glyph_width + 1) || pixel_y == 0 || pixel_y == (glyph_height + 1))){
+                    unsigned int glyph_buffer_index = ((pixel_y - 1) * glyph_width) + (pixel_x - 1);
+                    pixel_value = glyph_buffer[glyph_buffer_index];
+                };
                 rgba_buffer[pixel_index].r = pixel_value;
                 rgba_buffer[pixel_index].g = pixel_value;
                 rgba_buffer[pixel_index].b = pixel_value;
                 rgba_buffer[pixel_index].a = pixel_value;
             }
         }
-        font_imgs[i] = (ImageData){.width = glyph_width, .height = glyph_height, .data = (unsigned char *)rgba_buffer};
+        font_imgs[i] = (ImageData){.width = pad_width, .height = pad_height, .data = (unsigned char *)rgba_buffer, .padded = true};
         glyph_info[i] = (GlyphInfo){.image_data_index = i + *num_imgs, .metrics = glyph->metrics};
     }
     int n = *num_imgs;
@@ -94,15 +101,14 @@ void drawLabel(App * app, GlyphInfo * glyph_info, ImageData *imgs, char * ascii_
             vec2 scale = {(float)(metrics.width >> 6), (float)(metrics.height >> 6)};
             vec2 pos_plus_offset;
             vec2 draw_pos;
-            
             glm_vec2_add(position, offset, pos_plus_offset);
             glm_vec2_add(pos_plus_offset, metrics_pos, draw_pos);
             drawQuad(
                 app, draw_pos, scale,
-                (FragUniform){.type = GkurveType_Filled,
+                (FragUniform){.type = GkurveType_Triangle,
                               .blend_color = {text_color[0], text_color[1],
                                               text_color[2], text_color[3]}},
-                imgs[glyph_info[char_code].image_data_index].uv_data);
+                imgs[glyph_info[char_code].image_data_index].uv);
             offset[0] += metrics.horiAdvance >> 6;
         }
     }
