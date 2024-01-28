@@ -194,7 +194,7 @@ memset(white_texture_data, 0xff, white_tex_data_size);
 size_t num_imgs = 2;
 ImageData * imgs = malloc(sizeof(ImageData) * num_imgs);
 imgs[0] = (ImageData){.width = img_width, .height = img_height, .data = img, .padded = false};
-imgs[1] = (ImageData){.width = white_tex_scale, .height = white_tex_scale, .data = white_texture_data, .padded = false};
+imgs[1] = (ImageData){.width = white_tex_scale, .height = white_tex_scale, .data = white_texture_data, .padded = true};
 #if DEMOMODE_BITMAP_TEXT
 GlyphInfo * glyph_info = labelInit(RESOURCE_DIR "FiraSans-Regular.ttf", 40, &imgs, &num_imgs);
 #endif
