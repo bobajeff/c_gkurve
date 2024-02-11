@@ -24,7 +24,7 @@ cmake --build build
 ### Get the assets first
 * Download the [FiraSans-Regular.ttf and gotta-go-fast.png files](https://github.com/bobajeff/c_gkurve_assets)
 * Put them in the source directory.
-
+### Run gkurve
 From the source directory run:
 ```sh
 ./build/gkurve
