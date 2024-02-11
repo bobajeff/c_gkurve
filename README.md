@@ -5,12 +5,16 @@ A simpler way to do 2D/Vector graphics on the GPU. Right now it uses a combinati
 
 Here's a [video presentation about it](https://www.youtube.com/watch?v=QTybQ-5MlrE) and the [slides of that presentation](https://docs.google.com/presentation/d/1IY-05VHPuUfS3e22D-BorDh8HMz14i6cLcddAGAhUZo) and also the [discord where it's discussed](https://discord.com/channels/996677443681267802/1150498877338828832/1153338351672373359).
 ## Building
-### Get the webgpu backend
-* Download a build of [wgpu-native](https://github.com/gfx-rs/wgpu-native/releases)
-* extract in source directory
-* rename that folder to `wgpu` (my build script will look for this folder)
+### Install dependencies
+* freetype2 library (required)
+    * for ubuntu based systems the command is `sudo apt-get install libfreetype-dev`
+* wgpu-native v0.17.0.2 (required) -
+    * Download the [wgpu-native v0.17.0.2](https://github.com/gfx-rs/wgpu-native/releases/tag/v0.17.0.2) build
+    * extract in source directory 
+    * rename folder to `wgpu`
 
-Then in the source directory run:
+### build the project
+In the source directory run:
 ```sh
 cmake -B build
 cmake --build build
